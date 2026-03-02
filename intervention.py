@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Intervention Module - Visual and Audio Interventions
 Handles all overlays, breathing exercises, and audio feedback
@@ -31,7 +30,7 @@ class BrownNoisePlayer:
                 brown_noise_path = os.path.join(os.path.dirname(__file__), "assets", "brown_noise.mp3")
                 if os.path.exists(brown_noise_path):
                     self.sound = pygame.mixer.Sound(brown_noise_path)
-                    self.sound.play(-1)  # -1 means loop indefinitely
+                    self.sound.play(-1)
                     self.playing = True
                 else:
                     print(f"[AUDIO] Brown noise file not found at {brown_noise_path}")
@@ -68,7 +67,6 @@ class WhiteNoiseBeeper:
             import winsound
             while self.playing:
                 try:
-                    # Beep pattern: medium frequency tone
                     winsound.Beep(300, 80)
                     time.sleep(0.1)
                 except:
@@ -96,7 +94,7 @@ class ZenMeditationPlayer:
                 meditation_path = os.path.join(os.path.dirname(__file__), "assets", "zen-meditation-180194.mp3")
                 if os.path.exists(meditation_path):
                     self.sound = pygame.mixer.Sound(meditation_path)
-                    self.sound.play(-1)  # -1 means loop indefinitely
+                    self.sound.play(-1)
                     self.playing = True
                 else:
                     print(f"[AUDIO] Zen meditation file not found at {meditation_path}")
@@ -157,7 +155,6 @@ class EnergyBreakOverlay:
         )
         self.canvas.pack()
         
-        # ESC key to deactivate
         self.root.bind('<Escape>', self._on_escape)
         self.root.focus_set()
         self._animate()
@@ -180,29 +177,22 @@ class EnergyBreakOverlay:
         center_y = screen_height // 2
         
         self.canvas.delete("all")
-        
-        # Bright orange/yellow background
         self.canvas.create_rectangle(
             0, 0, screen_width, screen_height,
             fill='#ff9500', outline=""
         )
-        
-        # Main title
         self.canvas.create_text(
             center_x, center_y - 200,
             text="⚡ FATIGUE DETECTED! ⚡",
             font=("Arial", 72, "bold"),
             fill="white"
         )
-        
         self.canvas.create_text(
             center_x, center_y - 100,
             text="LET'S ENERGIZE!",
             font=("Arial", 56, "bold"),
             fill="white"
         )
-        
-        # Exercise prompts - cycle through them
         exercises = [
             "🏃 Do 5 Jumping Jacks NOW!",
             "💪 Stretch your arms upward!",
@@ -210,7 +200,6 @@ class EnergyBreakOverlay:
             "🤸 Do 3 quick squats!",
             "😤 Take 3 deep breaths!"
         ]
-        
         current_exercise = exercises[self.exercise_index % len(exercises)]
         
         self.canvas.create_text(
@@ -219,16 +208,12 @@ class EnergyBreakOverlay:
             font=("Arial", 48, "bold"),
             fill="#ffffff"
         )
-        
-        # Countdown or message
         self.canvas.create_text(
             center_x, center_y + 150,
             text="You'll return to work after this break",
             font=("Arial", 28),
             fill="white"
         )
-        
-        # Exit instructions - UPDATED
         self.canvas.create_text(
             center_x, screen_height - 100,
             text="Press ESC or show 👌 OK sign to exit",
@@ -244,8 +229,6 @@ class EnergyBreakOverlay:
         self.exercise_index = 0
         self.exercise_start_time = time.time()
         print("[ENERGY] Activating energy break - Fatigue detected!")
-        
-        # Play upbeat energy audio
         self._play_energy_audio()
     
     def _play_energy_audio(self):
@@ -262,7 +245,7 @@ class EnergyBreakOverlay:
             print(f"[AUDIO] Could not play energy audio: {e}")
     
     def deactivate(self):
-        """Deactivate energy break - FIXED: Now properly exits"""
+        """Deactivate energy break"""
         self.active = False
         if self.sound:
             self.sound.stop()
@@ -272,8 +255,6 @@ class EnergyBreakOverlay:
             except:
                 pass
         print("[ENERGY] Energy break ended")
-        
-        # Call exit callback if set
         if self.exit_callback:
             self.exit_callback()
 
@@ -333,7 +314,6 @@ class BreathingOverlay:
         center_y = screen_height // 2
         
         self.canvas.delete("all")
-        
         current_time = time.time()
         elapsed = current_time - self.phase_start
         duration = 4.0
@@ -347,7 +327,6 @@ class BreathingOverlay:
                 progress = elapsed / duration
             color = "#4a90e2"
             instruction = "BREATHE IN"
-            
         elif self.phase == "hold1":
             if elapsed >= duration:
                 self.phase = "exhale"
@@ -357,7 +336,6 @@ class BreathingOverlay:
                 progress = 1.0
             color = "#50c878"
             instruction = "HOLD"
-            
         elif self.phase == "exhale":
             if elapsed >= duration:
                 self.phase = "hold2"
@@ -367,8 +345,7 @@ class BreathingOverlay:
                 progress = 1.0 - (elapsed / duration)
             color = "#9b59b6"
             instruction = "BREATHE OUT"
-            
-        else:  # hold2
+        else:
             if elapsed >= duration:
                 self.phase = "inhale"
                 self.phase_start = current_time
@@ -377,7 +354,6 @@ class BreathingOverlay:
                 progress = 0.0
             color = "#50c878"
             instruction = "HOLD"
-        
         min_radius = 80
         max_radius = 250
         radius = min_radius + (max_radius - min_radius) * progress
@@ -394,7 +370,6 @@ class BreathingOverlay:
             font=("Arial", 48, "bold"),
             fill="white"
         )
-        
         bar_width = 600
         bar_height = 30
         bar_x = center_x - bar_width // 2
@@ -412,7 +387,6 @@ class BreathingOverlay:
             bar_x + int(bar_width * phase_progress), bar_y + bar_height,
             fill=color, outline=""
         )
-        
         remaining = duration - elapsed
         self.canvas.create_text(
             center_x, bar_y + bar_height + 40,
@@ -420,8 +394,6 @@ class BreathingOverlay:
             font=("Arial", 24),
             fill="white"
         )
-        
-        # Exit instructions
         self.canvas.create_text(
             center_x, screen_height - 80,
             text="Press ESC or show 👌 OK sign to exit",
@@ -478,7 +450,6 @@ class ScreenWarmer:
             highlightthickness=0
         )
         self.canvas.pack()
-        
         self._update()
         self.root.mainloop()
     
@@ -494,7 +465,6 @@ class ScreenWarmer:
         if self.warmth > 0:
             alpha_value = (self.warmth / 100.0) * 0.4
             self.root.attributes('-alpha', alpha_value)
-            
             self.canvas.create_rectangle(
                 0, 0, screen_width, screen_height,
                 fill='#ff8800', outline=""

@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
 ZenSpace - Enhanced Full Screen Intervention System
-Main connector module between gesture detection and interventions
 """
 
 import cv2
@@ -11,7 +9,6 @@ import sys
 import os
 from collections import deque
 
-# Import detector and intervention modules
 from detector import GestureDetector
 from intervention import (
     BrownNoisePlayer,
@@ -25,7 +22,6 @@ from intervention import (
     PostureWarningOverlay
 )
 
-# Force UTF-8 encoding for Windows
 if sys.platform == 'win32':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -35,10 +31,8 @@ class ZenSpaceEnhanced:
     """Main ZenSpace controller - connects detection with interventions"""
     
     def __init__(self):
-        # Initialize detector
         self.detector = GestureDetector()
         
-        # Gesture state tracking
         self.gesture_timers = {
             'open_palm': None,
             'both_hands_raised': None,
@@ -68,8 +62,8 @@ class ZenSpaceEnhanced:
         # Yawn and fatigue tracking
         self.energy_break_active = False
         self.yawn_counter = 0
-        self.yawn_window = deque(maxlen=750)  # 750 frames at ~30fps = ~25 seconds observation window
-        self.yawn_threshold = 5  # 5 yawns in window triggers energy break
+        self.yawn_window = deque(maxlen=750)
+        self.yawn_threshold = 5
         self.last_yawn_detected = False
         
         # Phone distraction tracking
@@ -82,14 +76,14 @@ class ZenSpaceEnhanced:
         self.bad_posture_active = False
         self.bad_posture_start = None
         self.posture_issues = {}
-        self.posture_warning_threshold = 30  # seconds
+        self.posture_warning_threshold = 30
         
         # Nail biting tracking
-        self.nail_biting_count = 0  # Count of nail biting episodes
+        self.nail_biting_count = 0
         self.nail_biting_active = False
         self.last_nail_biting_detected = False
-        self.nail_biting_threshold = 6  # Anxiety threshold
-        self.nail_biting_warmth_levels = [10, 20, 30, 40, 50]  # Progressive warmth for episodes 1-5
+        self.nail_biting_threshold = 6
+        self.nail_biting_warmth_levels = [10, 20, 30, 40, 50]
         
         # Initialize intervention components
         self.brown_noise = BrownNoisePlayer()
@@ -103,13 +97,8 @@ class ZenSpaceEnhanced:
         self.face_touch_count = 0
         self.face_touch_window = deque(maxlen=300)
         self.last_hand_movement_time = time.time()
-        
         self.current_min_distance = 999.0
-        
-        # Initialize video capture
         self.cap = cv2.VideoCapture(0)
-        
-        # Initialize overlays
         self.breathing_overlay = BreathingOverlay()
         self.screen_warmer = ScreenWarmer()
         self.zen_dim = ZenModeDim()
@@ -128,8 +117,6 @@ class ZenSpaceEnhanced:
         self.posture_warning_overlay.start()
         time.sleep(1)
         print("[INIT] All systems ready!")
-    
-    # ==================== EXIT ALL MODES ====================
     
     def exit_all_modes(self):
         """Properly exit all active modes"""
@@ -185,7 +172,6 @@ class ZenSpaceEnhanced:
         self.yawn_counter = 0
         self.yawn_window.clear()
     
-    # ==================== GESTURE PROCESSING ====================
     
     def process_gestures(self, hand_results, pose_results, face_results, frame_shape):
         """Process all gesture recognitions and trigger interventions"""
@@ -197,8 +183,6 @@ class ZenSpaceEnhanced:
         if hand_landmarks:
             self.last_hand_movement_time = current_time
         
-        # ===== YAWN & FATIGUE DETECTION =====
-        # 🥱 Check for yawns using face mesh
         yawn_detected = False
         if face_landmarks:
             for face_landmark in face_landmarks:
@@ -213,11 +197,8 @@ class ZenSpaceEnhanced:
         if yawn_detected and not self.last_yawn_detected:
             self.yawn_counter += 1
             print(f"[YAWN] Yawn detected! Count: {self.yawn_counter} in window")
-        
-        self.last_yawn_detected = yawn_detected
-        
+
         # Check if threshold met for energy break
-        # Use yawn_counter (distinct yawns) instead of window sum (frame count)
         if self.yawn_counter >= self.yawn_threshold and not self.energy_break_active:
             print(f"[!!!] FATIGUE ALERT - {self.yawn_counter} yawns detected!")
             self.energy_break_active = True
@@ -226,7 +207,6 @@ class ZenSpaceEnhanced:
         
         # Don't process other gestures if energy break is active
         if self.energy_break_active:
-            # FIXED: Allow OK sign to exit energy break
             if hand_landmarks and self.detector.check_ok_sign(hand_landmarks):
                 if self.gesture_timers['ok_sign'] is None:
                     self.gesture_timers['ok_sign'] = current_time
@@ -236,12 +216,11 @@ class ZenSpaceEnhanced:
                     self.energy_break_active = False
                     self.energy_break.deactivate()
                     self.gesture_timers['ok_sign'] = None
-                    self.yawn_window.clear()  # Clear yawn window on exit
+                    self.yawn_window.clear()
             else:
                 self.gesture_timers['ok_sign'] = None
             return
         
-        # ===== PRIORITY: OK SIGN TO EXIT =====
         # Check OK sign first to allow immediate exit
         if self.detector.check_ok_sign(hand_landmarks):
             if self.gesture_timers['ok_sign'] is None:
@@ -251,34 +230,22 @@ class ZenSpaceEnhanced:
                 self.gesture_timers['ok_sign'] = None
         else:
             self.gesture_timers['ok_sign'] = None
-        
-        # ===== NAIL BITING DETECTION (Priority - check first!) =====
-        # 🤏 Fingers Near Mouth - Progressive Nail Biting Detection
-        # Episodes 1-5: Habit-induced (warmth only, progressive)
-        # Episode 6+: Anxiety-induced (breathing exercise)
-        # CHECK THIS BEFORE OTHER GESTURES TO AVOID FALSE POSITIVES
         nail_biting_detected = self.detector.check_fingers_near_mouth(hand_landmarks, pose_landmarks, frame_shape)
         
         if nail_biting_detected:
             if self.gesture_timers['fingers_near_mouth'] is None:
                 self.gesture_timers['fingers_near_mouth'] = current_time
             elif current_time - self.gesture_timers['fingers_near_mouth'] > 2:
-                # Count this as a nail biting episode (only once per session)
                 if not self.last_nail_biting_detected:
                     self.nail_biting_count += 1
                     self.last_nail_biting_detected = True
-                    
                     if self.nail_biting_count < self.nail_biting_threshold:
-                        # Episodes 1-5: Habit-induced - Progressive warmth only
-                        # EXPLICITLY ensure breathing is NOT activated
                         warmth_level = self.nail_biting_warmth_levels[min(self.nail_biting_count - 1, 4)]
                         self.screen_warmer.set_warmth(warmth_level)
                         print(f"[HABIT] Nail biting detected (Episode {self.nail_biting_count}/{self.nail_biting_threshold - 1})")
                         print(f"   Screen warmth: {warmth_level}% - Building awareness")
                         print(f"   NO breathing exercise (habit phase)")
-                        
                     else:
-                        # Episode 6+: Anxiety-induced - Trigger breathing exercise
                         if self.nail_biting_count == self.nail_biting_threshold:
                             print(f"[!!!] ANXIETY ALERT - {self.nail_biting_count} nail biting episodes!")
                             print("   This suggests anxiety, not just habit")
@@ -296,31 +263,18 @@ class ZenSpaceEnhanced:
                         self.screen_warmer.set_warmth(70)
                         self.nail_biting_active = True
         else:
-            # Hand moved away from mouth
             if self.last_nail_biting_detected:
                 self.last_nail_biting_detected = False
                 print(f"[OK] Hands away from mouth (Total episodes: {self.nail_biting_count})")
-                
-            # Reset timer
             self.gesture_timers['fingers_near_mouth'] = None
-            
-            # Gradually reduce warmth if not in anxiety mode
             if not self.nail_biting_active:
                 if self.screen_warmer.warmth > 0 and self.screen_warmer.warmth <= 50:
                     self.screen_warmer.set_warmth(0)
-        
-        # Don't process other gestures if already in a mode (except exit and nail biting)
-        # Also skip if nail biting is detected to avoid false positives from other gesture detectors
         if self.zen_mode_active or self.breathing_active or self.quiet_mode_active or self.focus_mode_active:
             return
-        
-        # If fingers are near mouth, skip other gesture detection to prevent false positives
         if nail_biting_detected:
             return
         
-        # ===== EMERGENCY GESTURES =====
-        
-        # ✋ Open Palm - Zen Mode
         if self.detector.check_open_palm(hand_landmarks):
             if self.gesture_timers['open_palm'] is None:
                 self.gesture_timers['open_palm'] = current_time
@@ -331,8 +285,6 @@ class ZenSpaceEnhanced:
                 self.zen_meditation.start()
         else:
             self.gesture_timers['open_palm'] = None
-        
-        # 🙌 Both Hands Raised - Pause + Breathing
         if self.detector.check_both_hands_raised(hand_landmarks, pose_landmarks):
             if self.gesture_timers['both_hands_raised'] is None:
                 self.gesture_timers['both_hands_raised'] = current_time
@@ -343,8 +295,6 @@ class ZenSpaceEnhanced:
                 self.zen_meditation.start()
         else:
             self.gesture_timers['both_hands_raised'] = None
-        
-        # 🙉 Hands Covering Ears - QUIET MODE WITH BROWN NOISE
         if self.detector.check_hands_covering_ears(hand_landmarks, pose_landmarks):
             if self.gesture_timers['hands_covering_ears'] is None:
                 self.gesture_timers['hands_covering_ears'] = current_time
@@ -356,8 +306,6 @@ class ZenSpaceEnhanced:
                     self.zen_dim.activate("QUIET MODE", "quiet")
         else:
             self.gesture_timers['hands_covering_ears'] = None
-        
-        # ✊ Clenched Fist - Box Breathing + Warmth
         if self.detector.check_clenched_fist(hand_landmarks):
             if self.gesture_timers['clenched_fist'] is None:
                 self.gesture_timers['clenched_fist'] = current_time
@@ -369,8 +317,6 @@ class ZenSpaceEnhanced:
                 self.zen_meditation.start()
         else:
             self.gesture_timers['clenched_fist'] = None
-        
-        # ✌️ Peace Sign - FOCUS MODE WITH BLUR
         if self.detector.check_peace_sign(hand_landmarks):
             if self.gesture_timers['peace_sign'] is None:
                 self.gesture_timers['peace_sign'] = current_time
@@ -381,8 +327,6 @@ class ZenSpaceEnhanced:
                     self.zen_dim.activate("5 MINUTE FOCUS PAUSE", "focus")
         else:
             self.gesture_timers['peace_sign'] = None
-        
-        # 🤲 Palms Together - Mindfulness
         if self.detector.check_palms_together(hand_landmarks):
             if self.gesture_timers['palms_together'] is None:
                 self.gesture_timers['palms_together'] = current_time
@@ -393,9 +337,6 @@ class ZenSpaceEnhanced:
                 self.zen_meditation.start()
         else:
             self.gesture_timers['palms_together'] = None
-        
-        # ===== PHONE DISTRACTION DETECTION =====
-        # 📱 Looking Down at Phone - Distraction Warning
         looking_down = self.detector.check_looking_down_at_phone(pose_landmarks)
         
         if looking_down:
@@ -408,9 +349,7 @@ class ZenSpaceEnhanced:
             if elapsed > 3 and not self.distraction_warning_active:
                 print("[!!!] PHONE DISTRACTION - You're looking at your phone!")
                 self.distraction_warning_active = True
-                # Subtle orange warmth to remind user
                 self.screen_warmer.set_warmth(40)
-                # Start beeping alert
                 self.distraction_beeper.start()
         else:
             # Looking back up - clear warning
@@ -421,9 +360,6 @@ class ZenSpaceEnhanced:
                 # Stop beeping
                 self.distraction_beeper.stop()
             self.looking_down_start = None
-
-        # ===== BAD POSTURE DETECTION =====
-        # 🧍 Check for bad posture (tech neck, slouching, etc.)
         has_bad_posture, posture_issues = self.detector.check_bad_posture(pose_landmarks)
         self.posture_issues = posture_issues
         
@@ -439,28 +375,20 @@ class ZenSpaceEnhanced:
                     print("  - Rounded shoulders")
                 if posture_issues.get('uneven_shoulders'):
                     print("  - Uneven shoulders")
-            
-            # After threshold seconds of bad posture, activate warning
             elapsed = current_time - self.bad_posture_start
             if elapsed > self.posture_warning_threshold and not self.bad_posture_active:
                 print(f"[!!!] BAD POSTURE ALERT - {elapsed:.0f}s of poor posture!")
                 self.bad_posture_active = True
-                # Activate fullscreen warning overlay
                 self.posture_warning_overlay.activate(posture_issues)
-                # Start beeping
                 self.posture_beeper.start()
-                # Add warmth to screen
                 self.screen_warmer.set_warmth(50)
         else:
             # Good posture restored
             if self.bad_posture_active or self.bad_posture_start is not None:
                 if self.bad_posture_active:
                     print("[OK] Great! Posture corrected!")
-                    # Deactivate warning overlay
                     self.posture_warning_overlay.deactivate()
-                    # Stop beeping
                     self.posture_beeper.stop()
-                    # Remove warmth
                     self.screen_warmer.set_warmth(0)
                 self.bad_posture_active = False
                 self.bad_posture_start = None
@@ -518,10 +446,7 @@ class ZenSpaceEnhanced:
                 posture_points = self.detector.get_posture_visualization_points(pose_results.pose_landmarks)
                 
                 if posture_points and (self.bad_posture_active or any(self.posture_issues.values())):
-                    # BAD POSTURE - Draw in RED with thicker lines
                     h, w = frame.shape[:2]
-                    
-                    # Define connections for posture spine
                     connections = [
                         ('left_ear', 'left_shoulder'),
                         ('right_ear', 'right_shoulder'),
@@ -530,28 +455,21 @@ class ZenSpaceEnhanced:
                         ('right_shoulder', 'right_hip'),
                         ('left_hip', 'right_hip'),
                     ]
-                    
-                    # Draw lines in RED
                     for start_name, end_name in connections:
                         start = posture_points[start_name]
                         end = posture_points[end_name]
                         start_x, start_y = int(start.x * w), int(start.y * h)
                         end_x, end_y = int(end.x * w), int(end.y * h)
-                        cv2.line(frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 5)  # RED, thick
-                    
-                    # Draw points in RED
+                        cv2.line(frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 5)
                     for point_name, point in posture_points.items():
                         x, y = int(point.x * w), int(point.y * h)
-                        cv2.circle(frame, (x, y), 8, (0, 0, 255), -1)  # RED circles
-                else:
-                    # GOOD POSTURE - Draw in GREEN
+                        cv2.circle(frame, (x, y), 8, (0, 0, 255), -1)
                     self.detector.mp_drawing.draw_landmarks(
                         frame, pose_results.pose_landmarks, self.detector.mp_pose.POSE_CONNECTIONS,
                         landmark_drawing_spec=self.detector.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=3),
                         connection_drawing_spec=self.detector.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
                     )
             
-            # Draw mouth landmarks for yawn detection debugging (green)
             if face_results.multi_face_landmarks:
                 for face_landmark in face_results.multi_face_landmarks:
                     mouth_points = self.detector.get_mouth_landmarks(face_landmark)
@@ -560,9 +478,7 @@ class ZenSpaceEnhanced:
                         for point_name, point in mouth_points.items():
                             x = int(point.x * w)
                             y = int(point.y * h)
-                            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)  # Green circles
-            
-            # Show status
+                            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
             y_pos = 30
             statuses = [
                 ("Zen", self.zen_mode_active),
@@ -571,7 +487,6 @@ class ZenSpaceEnhanced:
                 ("Focus", self.focus_mode_active),
                 ("Energy", self.energy_break_active)
             ]
-            
             for label, active in statuses:
                 color = (0, 0, 255) if active else (0, 255, 0)
                 cv2.putText(frame, f"{label}: {'ACTIVE' if active else 'Ready'}", 
